@@ -216,6 +216,108 @@ class Encoder(nn.Module):
             x = layer(x, mask) #o/p of current layer bcomes i/p of next layer
         return self.norm(x)
 
+"""
+now we will be create the decoder block 
+shopping list:
+1x masked multihead -- self attention
+1x multihead -- cross attention
+3x add&norm / residual layers
+1x feedFwd
+1x residual conn from encoder
+"""
+
+class DecoderBlock(nn.Module):
+    def __init__(self, self_attention_block : MultiHeadAttentionBlock, cross_attention_block: MultiHeadAttentionBlock, feed_forward_block: FeedForwardBlock, dropout: float ) -> None:
+        super().__init__()
+        self.self_attention_block = self_attention_block
+        self.cross_attention_block = cross_attention_block
+        self.feed_forward_block = feed_forward_block
+        # we hv 3 residual conn too -- check shopping list
+        self.residual_connections = nn.Module([ResidualConnection(dropout) for _ in range(3)])
+    
+    #similar to encoder but woth a diff
+    # why are the msaks called as src and tgt -- beacuse im doing translation -- english and italian(tutorial) -- src comes from encoder (src lang) -- tgt comes from decoder (tgt lang)
+    def forward(self, x, encoder_output, src_mask, tgt_mask):
+        x = self.residual_connections[0](x, lambda x: self.self_attention_block(x,x,x,tgt_mask))
+        x = self.residual_connections[1](x, lambda x: self.cross_attention_block(x, encoder_output, encoder_output, src_mask))#query coming decoder, key and vlaue comes from encoder -- as well as the mask fo the encoder
+        x = self.residual_connections[3](x, self.feed_forward_block)
+        return x
+    
+class Decoder(nn.Module): #n times of the decoder block
+    def __init__(self, layers: nn.ModuleList) -> None:
+        super().__init__()
+        self.layers=layers
+        self.norm = LayerNormalzation()
+    
+    def forward(self, x, encoder_output, src_mask, tgt_mask):
+        #use the o/p of current as i/p of the nxt layer
+        for layer in self.layers:
+            x = layer(x, encoder_output, src_mask, tgt_mask)
+        return self.norm(x)
+    
+"""
+we've got both encoder and decoder
+we are still msisng the linear layer
+what does it do?
+A: we want map word back into the vocab as in sentences right
+the tutorial i use calls it a projection_layer
+"""
+
+class ProjectionLayer(nn.Module): 
+    def __init__(self, d_model: int, vocab_size: int) -> None:
+        super().__init__()
+        self.proj = nn.Linear(d_model, vocab_size) #convert d_model layers to vocab_size
+    
+    def forward(self, x):
+        #dimensions == (batch, seq_len, d_model) --> (batch, seq_len, vocab_size)
+        # Use softmax fnc again but use the modf version again -- the log version of it -- for numerical stability -- iits close enugh 
+        return torch.log_softmax(self.proj(x), dim=-1)
+
+"""
+since we have all the ingredients of the transformer
+we explain the transformer block now
+"""
+
+class Transformer(nn.Module):
+    def __init__(self, encoder, decoder, src_embed: InputEmbeddings, tgt_embed: InputEmbeddings, src_pos: PostionalEncoding, tgt_pos: PostionalEncoding, projection_layer : ProjectionLayer) -> None:
+        super().__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+        self.src_embed = src_embed
+        self.tgt_embed = tgt_embed
+        self.src_pos = src_pos
+        self.tgt_pos = tgt_pos
+        self.projection_layer = projection_layer
+        #apply three methods - encode - decode - proejct ; making just one fwd func is bad bcoz during inference we can reuse the o/p of encoder -- dont eed to do it every time
+        # easier visuals for attention if the o/p are diff for the three
+
+    def encode(self, src, src_mask):
+        src = self.src_embed(src)
+        src = self.src_pos(src)
+        return self.encoder(src, src_mask)
+    # refer the paper if any doubts here -- just refer the dgm -- ypull get whats happening
+
+    def decode(self, encoder_output, src_mask, tgt, tgt_mask):
+        tgt = self.tgt_embed(tgt)
+        tgt = self.tgt_pos(tgt)
+        return self.decoder(tgt, encoder_output, src_mask, tgt_mask)
+    #refer paper again this is the decoder
+
+    def project(self,x):
+        return self.projection_layer(x)
+    
+#given all the hyperparameeter -- build a transfoer - we need a function to combine all the blocks -- since we are going to do translation here 
+# we need the vocab_size of src and tgt to build the embedding -- need to convert the token to the size of 512 (refer paper) -- hence it needs to know how big it is
+# we need to it what the src and tgt seq lgt, could be same as well -- for ex if we deal with two diff lang
+# we need the d_model = 512 whihc is the same as paper
+# we need the hyperparameter layers or N which acc to paper is 6
+# we need the number of heads which acc to paper is 8
+# we need dropout as 0.1 -- from paper
+# dropout layer or feed forward layer stuff - from the paper is 2048
+def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int, tgt_seq_len: int, d_model: int=512, N: int=6, h: int=8, dropout: float=0.1, d_ff: int=2048) -> Transformer:
+    
+
+         
 
 
 
