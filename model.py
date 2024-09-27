@@ -233,7 +233,7 @@ class DecoderBlock(nn.Module):
         self.cross_attention_block = cross_attention_block
         self.feed_forward_block = feed_forward_block
         # we hv 3 residual conn too -- check shopping list
-        self.residual_connections = nn.Module([ResidualConnection(dropout) for _ in range(3)])
+        self.residual_connections = nn.ModuleList([ResidualConnection(dropout) for _ in range(3)])
     
     #similar to encoder but woth a diff
     # why are the msaks called as src and tgt -- beacuse im doing translation -- english and italian(tutorial) -- src comes from encoder (src lang) -- tgt comes from decoder (tgt lang)
@@ -357,6 +357,8 @@ def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int
         if p.dim()>1:
             nn.init.xavier_uniform_(p)
     return transformer
+
+#we now have to make the new training code
 
 
          
