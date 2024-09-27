@@ -315,7 +315,49 @@ class Transformer(nn.Module):
 # we need dropout as 0.1 -- from paper
 # dropout layer or feed forward layer stuff - from the paper is 2048
 def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int, tgt_seq_len: int, d_model: int=512, N: int=6, h: int=8, dropout: float=0.1, d_ff: int=2048) -> Transformer:
-    
+    #create the embed layers
+    src_embed = InputEmbeddings(d_model, src_vocab_size)
+    tgt_embed = InputEmbeddings(d_model, tgt_vocab_size)
+
+    #pos encodinglayers
+    src_pos = PostionalEncoding(d_model, src_seq_len, dropout) #  we dont need to create two pos encdoing layer - they do the same layer - they dont add parameter and also coz they have parameters
+    # more optimization can be done in the codebas here
+    # i am making this here again becasue i want the club members be able to follow this
+    tgt_pos =  PostionalEncoding(d_model, tgt_seq_len, dropout)
+
+    # next we create the encoder blocks again -- we have n of them so we use an ds
+    encoder_blocks = []
+    for _ in range(N):
+        encoder_self_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
+        feed_forward_block = FeedForwardBlock(d_model, d_ff, dropout)
+        encoder_block = EncoderBlock(encoder_self_attention_block, feed_forward_block)
+        encoder_blocks.append(encoder_block)
+
+    # same for decoder blcoks
+    decoder_blocks = []
+    for _ in range(N):
+        decoder_self_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
+        decoder_cross_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
+        feed_forward_block = FeedForwardBlock(d_model, d_ff, dropout)
+        decoder_block = DecoderBlock(decoder_self_attention_block, decoder_cross_attention_block, feed_forward_block, dropout)
+        decoder_blocks.append(decoder_block)
+
+    #Create the encoder and the decoder themselves together 
+    encoder = Encoder(nn.ModuleList(encoder_blocks))
+    decoder = Decoder(nn.ModuleList(decoder_blocks))
+    #stich together the projection layer to complete the implementation
+    projection_layer = ProjectionLayer(d_model, tgt_vocab_size) #which will covert d_model to vocab_size, since we want to convert from source to tgt vocab we give these params
+    #implement complete trandormer
+    transformer = Transformer(encoder, decoder, src_embed, tgt_embed, src_pos, tgt_pos, projection_layer)
+
+    #now we initialize the parameters -- we dont start with random values to make it faster
+    #we will start will xavier
+
+    for p in transformer.parameters():
+        if p.dim()>1:
+            nn.init.xavier_uniform_(p)
+    return transformer
+
 
          
 
