@@ -1,2 +1,7 @@
 .venv
 __pycache__
+model2.py
+model3.py
+runs
+opus_books_weights
+.gitignore
