@@ -2,8 +2,7 @@
 __pycache__
 
 model3.py
-runs
+runs/tmodel
 opus_books_weights
 .gitignore
 
-model2.py
